@@ -1,0 +1,121 @@
+body {
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+}
+
+.game-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.game-info {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 24px;
+    color: #333;
+}
+
+canvas {
+    background: white;
+    border: 1px solid #ccc;
+}
+
+.controls {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.horizontal-controls {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0;
+}
+
+button {
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+    border: 2px solid #333;
+    background-color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #eee;
+}
+
+.game-over, .pause-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.hidden {
+    display: none;
+}
+
+.instructions {
+    margin-top: 20px;
+    text-align: left;
+}
+
+.instructions p {
+    margin: 5px 0;
+    color: #666;
+}
+
+.game-stats {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.game-stats p {
+    margin: 10px 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.action-button {
+    width: 150px;
+    height: 40px;
+    margin: 10px;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.action-button:hover {
+    background-color: #45a049;
+}
+
+#continueBtn {
+    background-color: #2196F3;
+}
+
+#continueBtn:hover {
+    background-color: #1976D2;
+}
