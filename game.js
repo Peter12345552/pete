@@ -1,41 +1,38 @@
-const CELL_SIZE = 12;
-const GRID_SIZE = 50;
-const PADDING = 1;
-const GAME_TIME_LIMIT = 5 * 60; // 5分钟，以秒为单位
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-// 设置画布大小
-canvas.width = GRID_SIZE * CELL_SIZE;
-canvas.height = GRID_SIZE * CELL_SIZE;
+// 游戏常量
+const GAME_TIME_LIMIT = 120; // 2分钟 = 120秒
+const CELL_SIZE = 20;
+const GRID_SIZE = 20;
+const CANVAS_SIZE = CELL_SIZE * GRID_SIZE;
+const INITIAL_SNAKE_LENGTH = 3;
+const BASE_SPEED = 250; // 增加基础速度值（数值越大，移动越慢）
+const MAX_SPEED = BASE_SPEED / 1.5; // 调整最大速度，使其不会太快
+const SCORE_THRESHOLD = 30; // 增加分数阈值，让速度变化更平缓
 
 // 颜色定义
 const COLORS = {
-    BACKGROUND: 'white',
-    GRID: '#e0e0e0',
     SNAKE: '#4CAF50',
+    BACKGROUND: '#000000',
+    GRID: '#1a1a1a',
+    RED_FOOD: '#ff0000',
+    YELLOW_FOOD: '#ffff00',
+    BLUE_FOOD: '#0000ff',
     OBSTACLE: '#808080',
-    FOOD: {
-        RED: '#ff0000',    // +10分
-        YELLOW: '#ffff00', // +20分
-        BLUE: '#0000ff'    // +5分并减速
-    }
+    TEXT: '#ffffff'
 };
 
 // 方向映射
 const DIRECTIONS = {
-    37: { x: -1, y: 0 },  // 左
-    38: { x: 0, y: -1 },  // 上
-    39: { x: 1, y: 0 },   // 右
-    40: { x: 0, y: 1 }    // 下
+    37: { x: -1, y: 0 }, // 左
+    38: { x: 0, y: -1 }, // 上
+    39: { x: 1, y: 0 },  // 右
+    40: { x: 0, y: 1 }   // 下
 };
 
-// 食物类型及其分数
+// 食物类型
 const FOOD_TYPES = {
-    RED: { color: COLORS.FOOD.RED, points: 10, count: 6 },
-    YELLOW: { color: COLORS.FOOD.YELLOW, points: 20, count: 2 },
-    BLUE: { color: COLORS.FOOD.BLUE, points: 5, count: 2 }
+    RED: { color: COLORS.RED_FOOD, points: 10 },
+    YELLOW: { color: COLORS.YELLOW_FOOD, points: 20 },
+    BLUE: { color: COLORS.BLUE_FOOD, points: 5 }
 };
 
 class Snake {
@@ -44,21 +41,14 @@ class Snake {
     }
 
     reset() {
-        this.body = [{ x: 25, y: 25 }];
+        this.body = [];
+        const centerX = Math.floor(GRID_SIZE / 2);
+        const centerY = Math.floor(GRID_SIZE / 2);
+        for (let i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
+            this.body.push({ x: centerX - i, y: centerY });
+        }
         this.direction = { x: 1, y: 0 };
         this.nextDirection = { x: 1, y: 0 };
-        this.speedMultiplier = 1;
-    }
-
-    update() {
-        this.direction = this.nextDirection;
-        const head = { x: this.body[0].x + this.direction.x, y: this.body[0].y + this.direction.y };
-        
-        // 穿墙
-        head.x = (head.x + GRID_SIZE) % GRID_SIZE;
-        head.y = (head.y + GRID_SIZE) % GRID_SIZE;
-        
-        this.body.unshift(head);
     }
 
     changeDirection(newDirection) {
@@ -67,120 +57,74 @@ class Snake {
         }
     }
 
+    move() {
+        this.direction = this.nextDirection;
+        const head = { x: this.body[0].x + this.direction.x, y: this.body[0].y + this.direction.y };
+        this.body.unshift(head);
+        return this.body.pop();
+    }
+
     grow() {
-        // 不删除尾部，蛇会自然增长
+        const tail = this.body[this.body.length - 1];
+        this.body.push({ ...tail });
     }
 
-    shrink() {
-        this.body.pop();
-    }
-
-    checkCollision(position) {
-        return this.body.slice(1).some(segment => segment.x === position.x && segment.y === position.y);
+    checkCollision(x, y) {
+        return this.body.some(segment => segment.x === x && segment.y === y);
     }
 }
 
 class Game {
-    constructor() {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
         this.snake = new Snake();
         this.score = 0;
-        this.food = [];
+        this.foods = [];
         this.obstacles = [];
-        this.gameOver = false;
-        this.paused = false;
-        this.baseSpeed = 10;
+        this.isPaused = false;
+        this.isGameOver = false;
+        this.speed = BASE_SPEED;
         this.elapsedTime = 0;
-        this.pausedTime = 0;
-        this.lastPauseTime = 0;
-        this.actualGameTime = 0;
-        this.startTime = Date.now();
-        
+        this.lastFrameTime = 0;
+        this.lastObstacleMoveTime = 0; // 记录上次障碍物移动的时间
         this.setupControls();
+        this.generateFoods();
         this.generateObstacles();
-        this.generateFood();
-        this.startGameLoop();
     }
 
     reset() {
         this.snake.reset();
         this.score = 0;
-        this.food = [];
+        this.foods = [];
         this.obstacles = [];
-        this.gameOver = false;
-        this.paused = false;
+        this.isPaused = false;
+        this.isGameOver = false;
+        this.speed = BASE_SPEED;
         this.elapsedTime = 0;
-        this.pausedTime = 0;
-        this.actualGameTime = 0;
-        this.startTime = Date.now();
+        this.lastFrameTime = 0;
+        this.generateFoods();
         this.generateObstacles();
-        this.generateFood();
-        this.updateUI();
-    }
-
-    generateObstacles() {
-        this.obstacles = [];
-        while (this.obstacles.length < 10) {
-            const obstacle = {
-                x: Math.floor(Math.random() * GRID_SIZE),
-                y: Math.floor(Math.random() * GRID_SIZE)
-            };
-            
-            // 确保障碍物不会生成在蛇的位置
-            if (!this.snake.checkCollision(obstacle) && 
-                !this.obstacles.some(o => o.x === obstacle.x && o.y === obstacle.y)) {
-                this.obstacles.push(obstacle);
-            }
-        }
-    }
-
-    generateFood() {
-        this.food = [];
-        Object.entries(FOOD_TYPES).forEach(([type, info]) => {
-            for (let i = 0; i < info.count; i++) {
-                while (true) {
-                    const food = {
-                        x: Math.floor(Math.random() * GRID_SIZE),
-                        y: Math.floor(Math.random() * GRID_SIZE),
-                        type: type,
-                        color: info.color,
-                        points: info.points
-                    };
-                    
-                    if (!this.snake.checkCollision(food) && 
-                        !this.obstacles.some(o => o.x === food.x && o.y === food.y) &&
-                        !this.food.some(f => f.x === food.x && f.y === food.y)) {
-                        this.food.push(food);
-                        break;
-                    }
-                }
-            }
-        });
+        this.startGameLoop();
     }
 
     setupControls() {
-        // 键盘控制
         document.addEventListener('keydown', (e) => {
-            if (this.gameOver) {
-                if (e.code === 'Space') {
-                    this.reset();
-                }
+            if (e.keyCode === 32 && this.isGameOver) { // 空格键重新开始
+                this.reset();
                 return;
             }
-
-            if (e.keyCode === 80) { // P键暂停
+            if (e.keyCode === 80) { // P键暂停/继续
                 this.togglePause();
                 return;
             }
-
-            if (this.paused) return;
-
             const direction = DIRECTIONS[e.keyCode];
             if (direction) {
                 this.snake.changeDirection(direction);
             }
         });
 
-        // 屏幕按钮控制
+        // 设置屏幕按钮控制
         const buttons = {
             'upBtn': { x: 0, y: -1 },
             'leftBtn': { x: -1, y: 0 },
@@ -188,212 +132,285 @@ class Game {
             'downBtn': { x: 0, y: 1 }
         };
 
-        Object.entries(buttons).forEach(([id, direction]) => {
-            document.getElementById(id).addEventListener('click', () => {
-                if (!this.gameOver && !this.paused) {
-                    this.snake.changeDirection(direction);
-                }
-            });
-        });
+        for (const [id, direction] of Object.entries(buttons)) {
+            const button = document.getElementById(id);
+            if (button) {
+                button.addEventListener('click', () => {
+                    if (!this.isPaused && !this.isGameOver) {
+                        this.snake.changeDirection(direction);
+                    }
+                });
+            }
+        }
 
         // 重新开始按钮
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            this.reset();
-        });
-
-        // 继续游戏按钮
-        document.getElementById('continueBtn').addEventListener('click', () => {
-            if (this.gameOver) {
-                this.elapsedTime = 0;
-                this.pausedTime = 0;
-                this.actualGameTime = 0;
-                this.startTime = Date.now();
-                this.gameOver = false;
-                this.updateUI();
-                document.getElementById('gameOverScreen').classList.add('hidden');
-            }
-        });
+        const restartBtn = document.getElementById('restartBtn');
+        if (restartBtn) {
+            restartBtn.addEventListener('click', () => {
+                if (this.isGameOver) {
+                    this.reset();
+                }
+            });
+        }
     }
 
-    togglePause() {
-        this.paused = !this.paused;
-        if (this.paused) {
-            this.lastPauseTime = Date.now();
-            document.getElementById('pauseScreen').classList.remove('hidden');
-        } else {
-            this.pausedTime += (Date.now() - this.lastPauseTime) / 1000;
-            document.getElementById('pauseScreen').classList.add('hidden');
+    generateFoods() {
+        this.foods = [];
+        const foodCounts = { RED: 6, YELLOW: 2, BLUE: 2 };
+        
+        for (const [type, count] of Object.entries(foodCounts)) {
+            for (let i = 0; i < count; i++) {
+                this.generateFood(FOOD_TYPES[type]);
+            }
+        }
+    }
+
+    generateFood(foodType) {
+        let x, y;
+        do {
+            x = Math.floor(Math.random() * GRID_SIZE);
+            y = Math.floor(Math.random() * GRID_SIZE);
+        } while (
+            this.snake.checkCollision(x, y) ||
+            this.foods.some(food => food.x === x && food.y === y) ||
+            this.obstacles.some(obstacle => obstacle.x === x && obstacle.y === y)
+        );
+        this.foods.push({ x, y, type: foodType });
+    }
+
+    generateObstacles() {
+        this.obstacles = [];
+        for (let i = 0; i < 10; i++) {
+            let x, y;
+            do {
+                x = Math.floor(Math.random() * GRID_SIZE);
+                y = Math.floor(Math.random() * GRID_SIZE);
+            } while (
+                this.snake.checkCollision(x, y) ||
+                this.foods.some(food => food.x === x && food.y === y) ||
+                this.obstacles.some(obstacle => obstacle.x === x && obstacle.y === y)
+            );
+            this.obstacles.push({ x, y });
         }
     }
 
     checkCollisions() {
         const head = this.snake.body[0];
 
-        // 检查是否撞到障碍物
-        if (this.obstacles.some(obstacle => obstacle.x === head.x && obstacle.y === head.y)) {
+        // 检查墙壁碰撞
+        if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
             return true;
         }
 
-        // 检查是否撞到自己
-        if (this.snake.checkCollision(head)) {
-            return true;
+        // 检查自身碰撞
+        for (let i = 1; i < this.snake.body.length; i++) {
+            if (head.x === this.snake.body[i].x && head.y === this.snake.body[i].y) {
+                return true;
+            }
         }
 
-        // 检查是否吃到食物
-        const foodIndex = this.food.findIndex(food => food.x === head.x && food.y === head.y);
-        if (foodIndex !== -1) {
-            const food = this.food[foodIndex];
-            this.score += food.points;
-            this.snake.grow();
-            
-            // 蓝色食物减速效果
-            if (food.type === 'BLUE') {
-                this.snake.speedMultiplier = Math.max(0.5, this.snake.speedMultiplier - 0.1);
-            }
-            
-            this.food.splice(foodIndex, 1);
-            if (this.food.length === 0) {
-                this.generateFood();
-            }
-        } else {
-            this.snake.shrink();
-        }
-
-        return false;
+        // 检查障碍物碰撞
+        return this.obstacles.some(obstacle => head.x === obstacle.x && head.y === obstacle.y);
     }
 
-    updateUI() {
-        // 更新分数
-        document.getElementById('scoreText').textContent = this.score;
+    checkFood() {
+        const head = this.snake.body[0];
+        const foodIndex = this.foods.findIndex(food => food.x === head.x && food.y === head.y);
         
-        // 更新速度显示
-        document.getElementById('speedText').textContent = 
-            Math.round(this.baseSpeed * this.snake.speedMultiplier);
-        
-        // 更新计时器
-        const remainingTime = Math.max(0, GAME_TIME_LIMIT - this.elapsedTime);
-        const minutes = Math.floor(remainingTime / 60);
-        const seconds = Math.floor(remainingTime % 60);
-        document.getElementById('timerText').textContent = 
-            `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
-        // 更新暂停时间
-        if (this.paused) {
-            const currentPauseTime = Math.floor((Date.now() - this.lastPauseTime) / 1000);
-            document.getElementById('pausedTime').textContent = 
-                `${Math.floor(currentPauseTime / 60)}:${(currentPauseTime % 60).toString().padStart(2, '0')}`;
+        if (foodIndex !== -1) {
+            const food = this.foods[foodIndex];
+            this.score += food.type.points;
+            this.snake.grow();
+            this.foods.splice(foodIndex, 1);
+            this.generateFood(food.type);
+
+            // 根据分数调整速度
+            if (this.score % SCORE_THRESHOLD === 0) {
+                this.speed = Math.max(MAX_SPEED, BASE_SPEED - Math.floor(this.score / SCORE_THRESHOLD) * 10);
+            }
+
+            // 如果是蓝色食物，临时减速
+            if (food.type === FOOD_TYPES.BLUE) {
+                this.speed = BASE_SPEED;
+            }
+        }
+    }
+
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        const pauseScreen = document.getElementById('pauseScreen');
+        if (pauseScreen) {
+            pauseScreen.style.display = this.isPaused ? 'flex' : 'none';
+        }
+        if (!this.isPaused) {
+            this.lastFrameTime = performance.now();
+            this.startGameLoop();
+        }
+    }
+
+    drawGrid() {
+        this.ctx.strokeStyle = COLORS.GRID;
+        for (let i = 0; i <= GRID_SIZE; i++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(i * CELL_SIZE, 0);
+            this.ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+            this.ctx.stroke();
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, i * CELL_SIZE);
+            this.ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+            this.ctx.stroke();
         }
     }
 
     draw() {
         // 清空画布
-        ctx.fillStyle = COLORS.BACKGROUND;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        this.ctx.fillStyle = COLORS.BACKGROUND;
+        this.ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
         // 绘制网格
-        ctx.strokeStyle = COLORS.GRID;
-        for (let i = 0; i <= GRID_SIZE; i++) {
-            ctx.beginPath();
-            ctx.moveTo(i * CELL_SIZE, 0);
-            ctx.lineTo(i * CELL_SIZE, canvas.height);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(0, i * CELL_SIZE);
-            ctx.lineTo(canvas.width, i * CELL_SIZE);
-            ctx.stroke();
-        }
-
-        // 绘制障碍物
-        ctx.fillStyle = COLORS.OBSTACLE;
-        this.obstacles.forEach(obstacle => {
-            ctx.fillRect(
-                obstacle.x * CELL_SIZE + PADDING,
-                obstacle.y * CELL_SIZE + PADDING,
-                CELL_SIZE - 2 * PADDING,
-                CELL_SIZE - 2 * PADDING
-            );
-        });
+        this.drawGrid();
 
         // 绘制食物
-        this.food.forEach(food => {
-            ctx.fillStyle = food.color;
-            ctx.fillRect(
-                food.x * CELL_SIZE + PADDING,
-                food.y * CELL_SIZE + PADDING,
-                CELL_SIZE - 2 * PADDING,
-                CELL_SIZE - 2 * PADDING
-            );
+        this.foods.forEach(food => {
+            this.ctx.fillStyle = food.type.color;
+            this.ctx.fillRect(food.x * CELL_SIZE, food.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
+
+        // 绘制障碍物
+        this.ctx.fillStyle = COLORS.OBSTACLE;
+        this.obstacles.forEach(obstacle => {
+            this.ctx.fillRect(obstacle.x * CELL_SIZE, obstacle.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         });
 
         // 绘制蛇
-        ctx.fillStyle = COLORS.SNAKE;
+        this.ctx.fillStyle = COLORS.SNAKE;
         this.snake.body.forEach(segment => {
-            ctx.fillRect(
-                segment.x * CELL_SIZE + PADDING,
-                segment.y * CELL_SIZE + PADDING,
-                CELL_SIZE - 2 * PADDING,
-                CELL_SIZE - 2 * PADDING
-            );
+            this.ctx.fillRect(segment.x * CELL_SIZE, segment.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
+
+        // 更新分数和时间显示
+        const scoreElement = document.getElementById('score');
+        if (scoreElement) {
+            scoreElement.textContent = `分数: ${this.score}`;
+        }
+
+        const timeElement = document.getElementById('timeLeft');
+        if (timeElement) {
+            const timeLeft = Math.max(0, GAME_TIME_LIMIT - Math.floor(this.elapsedTime / 1000));
+            timeElement.textContent = `剩余时间: ${timeLeft}秒`;
+        }
+
+        // 游戏结束显示
+        if (this.isGameOver) {
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            if (gameOverScreen) {
+                gameOverScreen.style.display = 'flex';
+                const finalScore = document.getElementById('finalScore');
+                if (finalScore) {
+                    finalScore.textContent = `最终得分: ${this.score}`;
+                }
+            }
+        }
+    }
+
+    moveObstacles() {
+        this.obstacles.forEach(obstacle => {
+            // 随机选择移动方向（上、下、左、右）
+            const directions = [
+                { x: 0, y: -1 }, // 上
+                { x: 0, y: 1 },  // 下
+                { x: -1, y: 0 }, // 左
+                { x: 1, y: 0 }   // 右
+            ];
+            const direction = directions[Math.floor(Math.random() * directions.length)];
+            
+            // 计算新位置
+            const newX = obstacle.x + direction.x;
+            const newY = obstacle.y + direction.y;
+            
+            // 检查新位置是否有效
+            if (this.isValidObstaclePosition(newX, newY)) {
+                obstacle.x = newX;
+                obstacle.y = newY;
+            }
         });
     }
 
-    endGame() {
-        this.gameOver = true;
-        document.getElementById('gameOverScreen').classList.remove('hidden');
-        document.getElementById('finalScore').textContent = this.score;
-        
-        const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
-        const minutes = Math.floor(totalTime / 60);
-        const seconds = totalTime % 60;
-        document.getElementById('gameDuration').textContent = 
-            `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
-        const actualTime = Math.floor(this.actualGameTime);
-        const actualMinutes = Math.floor(actualTime / 60);
-        const actualSeconds = actualTime % 60;
-        document.getElementById('actualGameTime').textContent = 
-            `${actualMinutes}:${actualSeconds.toString().padStart(2, '0')}`;
+    isValidObstaclePosition(x, y) {
+        // 检查是否在网格范围内
+        if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+            return false;
+        }
+
+        // 检查是否与蛇重叠
+        if (this.snake.checkCollision(x, y)) {
+            return false;
+        }
+
+        // 检查是否与食物重叠
+        if (this.foods.some(food => food.x === x && food.y === y)) {
+            return false;
+        }
+
+        // 检查是否与其他障碍物重叠
+        if (this.obstacles.some(obs => obs.x === x && obs.y === y)) {
+            return false;
+        }
+
+        return true;
     }
 
     startGameLoop() {
-        let lastTime = performance.now();
-        const gameLoop = (currentTime) => {
-            const deltaTime = (currentTime - lastTime) / 1000;
-            lastTime = currentTime;
+        if (this.isPaused || this.isGameOver) return;
 
-            if (!this.gameOver && !this.paused) {
-                this.elapsedTime += deltaTime;
-                this.actualGameTime += deltaTime;
+        const currentTime = performance.now();
+        if (this.lastFrameTime === 0) {
+            this.lastFrameTime = currentTime;
+            this.lastObstacleMoveTime = currentTime;
+        }
 
-                // 根据分数调整速度
-                this.snake.speedMultiplier = Math.min(2, 1 + Math.floor(this.score / 20) * 0.1);
+        const deltaTime = currentTime - this.lastFrameTime;
+        this.elapsedTime += deltaTime;
+        this.lastFrameTime = currentTime;
 
-                // 检查时间限制
-                if (this.elapsedTime >= GAME_TIME_LIMIT) {
-                    this.endGame();
-                }
+        // 检查时间限制
+        if (this.elapsedTime >= GAME_TIME_LIMIT * 1000) {
+            this.isGameOver = true;
+            this.draw();
+            return;
+        }
 
-                // 更新游戏状态
-                this.snake.update();
-                if (this.checkCollisions()) {
-                    this.endGame();
-                }
+        // 每2秒移动一次障碍物
+        if (currentTime - this.lastObstacleMoveTime >= 2000) {
+            this.moveObstacles();
+            this.lastObstacleMoveTime = currentTime;
+        }
+
+        if (this.elapsedTime >= this.lastMoveTime + this.speed) {
+            const tail = this.snake.move();
+            
+            if (this.checkCollisions()) {
+                this.isGameOver = true;
+                this.draw();
+                return;
             }
 
-            // 更新UI和绘制
-            this.updateUI();
-            this.draw();
+            this.checkFood();
+            this.lastMoveTime = this.elapsedTime;
+        }
 
-            // 继续游戏循环
-            setTimeout(() => {
-                requestAnimationFrame(gameLoop);
-            }, 1000 / (this.baseSpeed * (this.snake.speedMultiplier || 1)));
-        };
-
-        requestAnimationFrame(gameLoop);
+        this.draw();
+        requestAnimationFrame(() => this.startGameLoop());
     }
 }
 
-// 启动游戏
-new Game();
+// 游戏初始化
+window.onload = () => {
+    const canvas = document.getElementById('gameCanvas');
+    if (canvas) {
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+        const game = new Game(canvas);
+        game.startGameLoop();
+    }
+};

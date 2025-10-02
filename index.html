@@ -9,10 +9,12 @@
 <body>
     <div class="game-container">
         <div class="game-info">
-            <div class="score">分数: <span id="scoreText">0</span></div>
-            <div class="timer">剩余时间: <span id="timerText">5:00</span></div>
+            <div id="score">分数: 0</div>
+            <div id="timeLeft">剩余时间: 120秒</div>
         </div>
+        
         <canvas id="gameCanvas"></canvas>
+        
         <div class="controls">
             <button id="upBtn">↑</button>
             <div class="horizontal-controls">
@@ -21,29 +23,33 @@
             </div>
             <button id="downBtn">↓</button>
         </div>
-        <div id="gameOverScreen" class="game-over hidden">
-            <h2>游戏结束!</h2>
-            <div class="game-stats">
-                <p>最终得分: <span id="finalScore">0</span></p>
-                <p>游戏时长: <span id="gameDuration">0:00</span></p>
-                <p>实际游戏时间: <span id="actualGameTime">0:00</span></p>
-            </div>
+    </div>
+
+    <div id="gameOverScreen" class="overlay">
+        <div class="overlay-content">
+            <h2>游戏结束</h2>
+            <p id="finalScore">最终得分: 0</p>
             <button id="restartBtn" class="action-button">重新开始</button>
-            <button id="continueBtn" class="action-button">继续游戏</button>
-        </div>
-        <div id="pauseScreen" class="pause-screen hidden">
-            <h2>游戏已暂停</h2>
-            <p>按 P 键继续游戏</p>
-            <div class="instructions">
-                <p>方向键或点击按钮控制方向</p>
-                <p>红色食物: +10分</p>
-                <p>黄色食物: +20分</p>
-                <p>蓝色食物: +5分并减速</p>
-                <p>当前速度: <span id="speedText">10</span></p>
-                <p>已暂停时间: <span id="pausedTime">0:00</span></p>
-            </div>
         </div>
     </div>
+
+    <div id="pauseScreen" class="overlay">
+        <div class="overlay-content">
+            <h2>游戏暂停</h2>
+            <p>按 P 键继续游戏</p>
+            <p>游戏说明:</p>
+            <ul>
+                <li>使用方向键或屏幕按钮控制蛇的移动</li>
+                <li>红色食物: +10分</li>
+                <li>黄色食物: +20分</li>
+                <li>蓝色食物: +5分并减速</li>
+                <li>每20分增加一次速度</li>
+                <li>碰到灰色障碍物或自己会结束游戏</li>
+                <li>游戏时间限制为2分钟</li>
+            </ul>
+        </div>
+    </div>
+
     <script src="game.js"></script>
 </body>
 </html>
